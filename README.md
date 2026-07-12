@@ -22,7 +22,7 @@ Ensure you have **Node.js** installed on your machine.
 Create or open the `.env` file in the root directory:
 ```ini
 DATABASE_URL="your-postgresql-connection-string"
-JWT_SECRET="assetflow-super-secret-key-123!"
+JWT_SECRET="secret-key-123"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 ```
 *(Supports local PostgreSQL or cloud databases like Neon DB).*
