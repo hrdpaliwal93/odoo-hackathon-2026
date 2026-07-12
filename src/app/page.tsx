@@ -1,65 +1,211 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
+
+export default function LoginPage() {
+  const { user, login } = useAuth();
+  const router = useRouter();
+
+  const [isLogin, setIsLogin] = useState(true);
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [seeding, setSeeding] = useState(false);
+
+  // If already logged in, redirect to dashboard
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard');
+    }
+  }, [user, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    const url = isLogin ? '/api/auth/login' : '/api/auth/signup';
+    const body = isLogin ? { email, password } : { name, email, password };
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'Something went wrong');
+        return;
+      }
+
+      if (isLogin) {
+        login(data.user);
+      } else {
+        setSuccess('Account registered successfully! You can now log in.');
+        setIsLogin(true);
+        setName('');
+        setPassword('');
+      }
+    } catch (err) {
+      setError('Connection failed. Make sure database is running.');
+    }
+  };
+
+  const handleSeed = async () => {
+    setSeeding(true);
+    setError('');
+    setSuccess('');
+    try {
+      const response = await fetch('/api/admin/seed', { method: 'POST' });
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess('Database successfully reset and seeded! Try login with: admin@assetflow.com / password123');
+      } else {
+        setError(data.error || 'Failed to seed');
+      }
+    } catch (err) {
+      setError('Failed to seed database');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div style={{
+      display: 'flex',
+      minHeight: '100vh',
+      backgroundColor: 'var(--bg-primary)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div className="glass-card" style={{ maxWidth: '440px', width: '100%', padding: '40px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
+          <div style={{
+            width: '56px',
+            height: '56px',
+            borderRadius: '14px',
+            background: 'var(--primary-gradient)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontWeight: 800,
+            fontSize: '1.75rem',
+            color: '#fff',
+            marginBottom: '16px'
+          }}>
+            AF
+          </div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 800 }}>AssetFlow</h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '4px' }}>
+            Enterprise Asset & Resource Management
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+
+        {error && <div className="alert alert-error" style={{ fontSize: '0.85rem' }}>{error}</div>}
+        {success && <div className="alert alert-success" style={{ fontSize: '0.85rem' }}>{success}</div>}
+
+        <form onSubmit={handleSubmit}>
+          {!isLogin && (
+            <div className="form-group">
+              <label className="form-label">Full Name</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Enter full name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+            </div>
+          )}
+
+          <div className="form-group">
+            <label className="form-label">Email Address</label>
+            <input
+              type="email"
+              className="form-control"
+              placeholder="name@organization.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              type="password"
+              className="form-control"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '10px' }}>
+            {isLogin ? 'Sign In' : 'Create Account'}
+          </button>
+        </form>
+
+        <div style={{ textAlign: 'center', marginTop: '24px', fontSize: '0.9rem' }}>
+          <span style={{ color: 'var(--text-secondary)' }}>
+            {isLogin ? "Don't have an account?" : 'Already have an account?'}
+          </span>{' '}
+          <button
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+              setSuccess('');
+            }}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--primary)',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
           >
-            Documentation
-          </a>
+            {isLogin ? 'Sign Up' : 'Log In'}
+          </button>
         </div>
-      </main>
+
+        <div style={{
+          marginTop: '32px',
+          paddingTop: '24px',
+          borderTop: '1px solid var(--border-color)',
+          textAlign: 'center'
+        }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '12px' }}>
+            HACKATHON / DEMO SANDBOX
+          </p>
+          <button
+            onClick={handleSeed}
+            disabled={seeding}
+            className="btn btn-secondary"
+            style={{ width: '100%', fontSize: '0.85rem', padding: '10px' }}
+          >
+            {seeding ? 'Seeding...' : 'Reset & Seed Demo Data'}
+          </button>
+          <div style={{ marginTop: '12px', fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'left', background: 'rgba(255,255,255,0.02)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <strong>Demo Accounts (password: password123):</strong>
+            <ul style={{ paddingLeft: '16px', marginTop: '6px' }}>
+              <li>Admin: admin@assetflow.com</li>
+              <li>Asset Mgr: sarah@assetflow.com</li>
+              <li>Dept Head: priya@assetflow.com</li>
+              <li>Employee: raj@assetflow.com</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
