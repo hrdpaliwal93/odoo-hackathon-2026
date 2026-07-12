@@ -42,7 +42,6 @@ next-env.d.ts
 
 src/app/admin
 src/app/allocations/
-/prisma
-schema.sql
+
 src/app/audits
 src/app/BOOKINGS

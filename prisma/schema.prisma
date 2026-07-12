@@ -1,0 +1,274 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  Admin
+  AssetManager
+  DepartmentHead
+  Employee
+}
+
+enum Condition {
+  New
+  Good
+  Fair
+  Poor
+}
+
+enum AssetStatus {
+  Available
+  Allocated
+  Reserved
+  UnderMaintenance
+  Lost
+  Retired
+  Disposed
+}
+
+enum TransferStatus {
+  Pending
+  Approved
+  Rejected
+}
+
+enum BookingStatus {
+  Upcoming
+  Ongoing
+  Completed
+  Cancelled
+}
+
+enum MaintenanceStatus {
+  Pending
+  Approved
+  Rejected
+  TechnicianAssigned
+  InProgress
+  Resolved
+}
+
+enum MaintenancePriority {
+  Low
+  Medium
+  High
+}
+
+enum AuditStatus {
+  Draft
+  Active
+  Closed
+}
+
+enum AuditCheckStatus {
+  Verified
+  Missing
+  Damaged
+}
+
+model User {
+  id                 String               @id @default(uuid())
+  name               String
+  email              String               @unique
+  passwordHash       String
+  role               Role                 @default(Employee)
+  departmentId       String?
+  department         Department?          @relation("EmployeeDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
+  status             String               @default("Active") // Active or Inactive
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  
+  headedDepartments  Department[]         @relation("DepartmentHead")
+  allocations        AssetAllocation[]
+  transferRequestsSrc TransferRequest[]   @relation("TransferSource")
+  transferRequestsDst TransferRequest[]   @relation("TransferTarget")
+  transfersApproved  TransferRequest[]    @relation("TransferApprover")
+  bookings           ResourceBooking[]
+  reportedMaintenance MaintenanceRequest[] @relation("ReportedBy")
+  auditedCycles      AuditAssignment[]
+  auditAssetChecks   AuditAssetCheck[]
+  notifications      Notification[]
+  activityLogs       ActivityLog[]
+}
+
+model Department {
+  id                 String            @id @default(uuid())
+  name               String            @unique
+  headId             String?           @unique
+  head               User?             @relation("DepartmentHead", fields: [headId], references: [id], onDelete: SetNull)
+  parentDepartmentId String?
+  parentDepartment   Department?       @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id], onDelete: Restrict)
+  subDepartments     Department[]      @relation("DepartmentHierarchy")
+  status             String            @default("Active") // Active, Inactive
+  createdAt          DateTime          @default(now())
+  
+  employees          User[]            @relation("EmployeeDepartment")
+  assets             Asset[]           @relation("AssetDepartment")
+  allocations        AssetAllocation[]
+  transferRequests   TransferRequest[]
+  bookings           ResourceBooking[]
+}
+
+model AssetCategory {
+  id           String   @id @default(uuid())
+  name         String   @unique
+  customFields Json?    // category-specific fields (e.g. warranty period)
+  createdAt    DateTime @default(now())
+  assets       Asset[]
+}
+
+model Asset {
+  id                  String               @id @default(uuid())
+  name                String
+  categoryId          String
+  category            AssetCategory        @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  assetTag            String               @unique // e.g. AF-0001
+  serialNumber        String               @unique
+  acquisitionDate     DateTime
+  acquisitionCost     Float
+  condition           Condition            @default(New)
+  location            String
+  status              AssetStatus          @default(Available)
+  isSharedBookable    Boolean              @default(false)
+  currentHolderId     String?
+  currentDepartmentId String?
+  currentDepartment   Department?          @relation("AssetDepartment", fields: [currentDepartmentId], references: [id], onDelete: SetNull)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  allocations         AssetAllocation[]
+  transfers           TransferRequest[]
+  maintenanceRequests MaintenanceRequest[]
+  auditChecks         AuditAssetCheck[]
+}
+
+model AssetAllocation {
+  id                 String    @id @default(uuid())
+  assetId            String
+  asset              Asset     @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  userId             String?
+  user               User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  departmentId       String?
+  department         Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  allocatedAt        DateTime  @default(now())
+  expectedReturnDate DateTime?
+  returnedAt         DateTime?
+  checkInNotes       String?
+  status             String    @default("Allocated") // Allocated, Returned, Overdue
+}
+
+model TransferRequest {
+  id              String         @id @default(uuid())
+  assetId         String
+  asset           Asset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  sourceUserId    String
+  sourceUser      User           @relation("TransferSource", fields: [sourceUserId], references: [id], onDelete: Restrict)
+  targetUserId    String
+  targetUser      User           @relation("TransferTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  departmentId    String?
+  department      Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  status          TransferStatus @default(Pending)
+  approvedByUserId String?
+  approvedByUser  User?          @relation("TransferApprover", fields: [approvedByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model Resource {
+  id          String            @id @default(uuid())
+  name        String            @unique
+  description String?
+  category    String            // Room, Vehicle, Equipment
+  location    String
+  createdAt   DateTime          @default(now())
+  bookings    ResourceBooking[]
+}
+
+model ResourceBooking {
+  id           String        @id @default(uuid())
+  resourceId   String
+  resource     Resource      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  departmentId String?
+  department   Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  startTime    DateTime
+  endTime      DateTime
+  status       BookingStatus @default(Upcoming)
+  createdAt    DateTime      @default(now())
+}
+
+model MaintenanceRequest {
+  id                 String              @id @default(uuid())
+  assetId            String
+  asset              Asset               @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  reportedByUserId   String
+  reportedByUser     User                @relation("ReportedBy", fields: [reportedByUserId], references: [id], onDelete: Restrict)
+  description        String
+  priority           MaintenancePriority @default(Medium)
+  photoUrl           String?
+  status             MaintenanceStatus   @default(Pending)
+  assignedTechnician String?
+  resolutionNotes    String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model AuditCycle {
+  id                String            @id @default(uuid())
+  name              String
+  status            AuditStatus       @default(Draft)
+  startDate         DateTime
+  endDate           DateTime
+  discrepancyReport String?
+  createdAt         DateTime          @default(now())
+  
+  assignments       AuditAssignment[]
+  assetChecks       AuditAssetCheck[]
+}
+
+model AuditAssignment {
+  id           String     @id @default(uuid())
+  auditCycleId String
+  auditCycle   AuditCycle @relation(fields: [auditCycleId], references: [id], onDelete: Cascade)
+  auditorId    String
+  auditor      User       @relation(fields: [auditorId], references: [id], onDelete: Cascade)
+}
+
+model AuditAssetCheck {
+  id           String           @id @default(uuid())
+  auditCycleId String
+  auditCycle   AuditCycle       @relation(fields: [auditCycleId], references: [id], onDelete: Cascade)
+  assetId      String
+  asset        Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  status       AuditCheckStatus
+  checkedAt    DateTime         @default(now())
+  checkedByUserId String
+  checkedByUser User            @relation(fields: [checkedByUserId], references: [id], onDelete: Restrict)
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  type      String   // info, alert, success, warning
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id         String   @id @default(uuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action     String
+  targetType String
+  targetId   String?
+  details    String?
+  createdAt  DateTime @default(now())
+}
