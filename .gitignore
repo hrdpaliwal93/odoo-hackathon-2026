@@ -40,6 +40,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-src/app
+src/app/admin
+src/app/allocations/
 /prisma
 schema.sql
+src/app/audits
+src/app/BOOKINGS
+src/app/maintenance
