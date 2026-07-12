@@ -46,4 +46,3 @@ src/app/allocations/
 schema.sql
 src/app/audits
 src/app/BOOKINGS
-src/app/maintenance
