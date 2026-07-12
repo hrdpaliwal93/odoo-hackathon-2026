@@ -43,5 +43,5 @@ next-env.d.ts
 src/app/admin
 src/app/allocations/
 
-src/app/audits
+
 src/app/BOOKINGS
